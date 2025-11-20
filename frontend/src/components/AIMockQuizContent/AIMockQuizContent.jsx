@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import axios from 'axios';
 
 const AIMockQuizContent = ({apiKey}) => {
@@ -9,55 +9,83 @@ const AIMockQuizContent = ({apiKey}) => {
   const [feedback, setFeedback] = useState("");
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState("intro");
+  const [error, setError] = useState("");
 
   const generateQuestions = async () => {
     if (!apiKey) {
-      alert('Please enter your Gemini API Key')
-      return
+      setError('Please enter your Gemini API Key');
+      return;
     }
 
     if (!jobDesc.trim()) {
-      alert("Please paste a job description first!");
+      setError("Please paste a job description first!");
       return;
     }
 
     setLoading(true);
     setFeedback("");
     setQuestions([]);
+    setError("");
 
     try {
       const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/generate`, { apiKey, jobDesc });
+      
+      if (!res.data) {
+        throw new Error("No response from server");
+      }
+
       const data = res.data;
 
-      if (data.questions && data.questions.length > 0) {
-        setQuestions(data.questions);
-        setStage("questions");
-        setCurrentIndex(0);
-      } else {
-        alert("Failed to generate questions.");
+      if (!data.questions || data.questions.length === 0) {
+        throw new Error("No questions were generated. Please try with a different job description.");
       }
-    } catch (err) {
-      console.error(err);
-      alert("Server error. Please try again.");
-    }
 
-    setLoading(false);
+      setQuestions(data.questions);
+      setStage("questions");
+      setCurrentIndex(0);
+    } catch (err) {
+      console.error("Error generating questions:", err);
+      
+      let errorMessage = "Failed to generate questions. ";
+      
+      if (err.response) {
+        if (err.response.status === 401) {
+          errorMessage = "Invalid API Key. Please check your Gemini API Key.";
+        } else if (err.response.status === 429) {
+          errorMessage = "API rate limit exceeded. Please try again later.";
+        } else if (err.response.data?.error) {
+          errorMessage = err.response.data.error;
+        } else {
+          errorMessage += `Server error: ${err.response.status}`;
+        }
+      } else if (err.request) {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getFeedback = async () => {
     const question = questions[currentIndex];
+    
     if (!apiKey) {
-      alert('Please enter your Gemini API Key')
-      return
+      setError('Please enter your Gemini API Key');
+      return;
     }
     
     if (!currentAnswer.trim()) {
-      alert("Please type your answer first!");
+      setError("Please type your answer first!");
       return;
     }
 
     setLoading(true);
     setFeedback("");
+    setError("");
 
     try {
       const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/feedback`, {
@@ -65,18 +93,43 @@ const AIMockQuizContent = ({apiKey}) => {
         question,
         answer: currentAnswer,
       });
+      
+      if (!res.data || !res.data.feedback) {
+        throw new Error("No feedback received from server");
+      }
+      
       setFeedback(res.data.feedback);
     } catch (err) {
-      console.error(err);
-      alert("Error fetching feedback. Try again.");
+      console.error("Error fetching feedback:", err);
+      
+      let errorMessage = "Failed to get feedback. ";
+      
+      if (err.response) {
+        if (err.response.status === 401) {
+          errorMessage = "Invalid API Key. Please check your Gemini API Key.";
+        } else if (err.response.status === 429) {
+          errorMessage = "API rate limit exceeded. Please try again later.";
+        } else if (err.response.data?.error) {
+          errorMessage = err.response.data.error;
+        } else {
+          errorMessage += `Server error: ${err.response.status}`;
+        }
+      } else if (err.request) {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const nextQuestion = () => {
     setFeedback("");
     setCurrentAnswer("");
+    setError("");
     setCurrentIndex((prev) => prev + 1);
   };
 
@@ -86,6 +139,22 @@ const AIMockQuizContent = ({apiKey}) => {
         <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-800 text-center">
           AI Mock Quiz
         </h1>
+
+        {error && (
+          <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-start gap-2">
+            <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-sm font-medium">{error}</p>
+            </div>
+            <button onClick={() => setError("")} className="text-red-700 hover:text-red-900">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {stage === "intro" && (
           <>

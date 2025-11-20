@@ -41,29 +41,37 @@ const Dashboard = () => {
 
   const fetchJobs = async () => {
     if (!apiKey.trim()) {
-      alert("Enter a valid Gemini API Key");
+      alert("Please enter a valid Gemini API Key");
       return;
     }
 
     if (!fileInputRef.current?.files[0]) {
-      alert("Upload a resume PDF first");
+      alert("Please upload a resume PDF first");
       return;
     }
 
-    try {
-      setError("");
-      setLoading(true);
+    setError("");
+    setLoading(true);
 
+    try {
       const file = fileInputRef.current.files[0];
 
       const formData = new FormData();
       formData.append("resume", file);
       formData.append("apiKey", apiKey);
 
-      // Extract skills from resume
-      const skillRes = await axios.post(`${backend}/extract-skills`, formData , {
+      const skillRes = await axios.post(`${backend}/extract-skills`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+
+      if (!skillRes.data || !skillRes.data.skills) {
+        throw new Error("Failed to extract skills from resume");
+      }
+
+      if (skillRes.data.skills.length === 0) {
+        throw new Error("No skills found in resume. Please upload a detailed resume.");
+      }
+
       setSkills(skillRes.data.skills);
 
       const jobRes = await axios.post(`${backend}/fetch-jobs`, {
@@ -75,10 +83,42 @@ const Dashboard = () => {
         remotework
       });
 
+      if (!jobRes.data || !jobRes.data.jobs) {
+        throw new Error("Failed to fetch jobs");
+      }
+
+      if (jobRes.data.jobs.length === 0) {
+        setJobs([]);
+        alert("No jobs found matching your criteria. Try changing the filters.");
+        return;
+      }
+
       setJobs(jobRes.data.jobs);
     } catch (err) {
-      console.error(err);
-      setError("Processing failed.");
+      console.error("Error fetching jobs:", err);
+      
+      let errorMessage = "Failed to process your request. ";
+      
+      if (err.response) {
+        if (err.response.status === 401) {
+          errorMessage = "Invalid API Key. Please check your Gemini API Key.";
+        } else if (err.response.status === 429) {
+          errorMessage = "API rate limit exceeded. Please try again later.";
+        } else if (err.response.status === 500) {
+          errorMessage = "Server error. Please try again later.";
+        } else if (err.response.data?.error) {
+          errorMessage = err.response.data.error;
+        } else {
+          errorMessage += `Error: ${err.response.status}`;
+        }
+      } else if (err.request) {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setJobs([]);
     } finally {
       setLoading(false);
     }
@@ -365,9 +405,43 @@ const Dashboard = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                {loading && <p style={{ color: "#0ea5e9" }} className="animate-pulse">Processing…</p>}
-                {error && <p style={{ color: "red" }} className="animate-shake">{error}</p>}
-                {jobs.length > 0 && (
+                {loading && (
+                  <div className="col-span-full flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mb-4"></div>
+                      <p className="text-blue-500 font-semibold">Processing your resume...</p>
+                    </div>
+                  </div>
+                )}
+                
+                {error && !loading && (
+                  <div className="col-span-full bg-red-50 border border-red-300 text-red-700 px-6 py-4 rounded-xl flex items-start gap-3">
+                    <svg className="w-6 h-6 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="font-semibold mb-1">Error</p>
+                      <p className="text-sm">{error}</p>
+                    </div>
+                    <button onClick={() => setError("")} className="text-red-700 hover:text-red-900">
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                
+                {!loading && !error && jobs.length === 0 && (
+                  <div className="col-span-full text-center py-12">
+                    <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <p className="text-gray-600 text-lg font-medium">No jobs found</p>
+                    <p className="text-gray-500 text-sm mt-2">Upload your resume and click search to find jobs</p>
+                  </div>
+                )}
+                
+                {jobs.length > 0 && !loading && (
                   <>
                     {jobs.map((job, i) => {
                       let animationClass = '';

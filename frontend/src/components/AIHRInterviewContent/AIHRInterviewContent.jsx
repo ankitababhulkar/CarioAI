@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const AIHRInterviewContent = ({ apiKey }) => {
   const [question, setQuestion] = useState("");
@@ -8,6 +8,7 @@ const AIHRInterviewContent = ({ apiKey }) => {
   const [interviewType, setInterviewType] = useState("HR");
   const [loading, setLoading] = useState(false);
   const [generateFeedback, setGenerateFeedback] = useState(false);
+  const [error, setError] = useState("");
   const recognitionRef = useRef(null);
   const finalTranscriptRef = useRef("");
 
@@ -62,62 +63,118 @@ const AIHRInterviewContent = ({ apiKey }) => {
 
   const fetchQuestion = async () => {
     if (!apiKey) {
-      alert('Please enter your Gemini API Key')
-      return
+      setError('Please enter your Gemini API Key');
+      return;
     }
+    
     const prompt = `Give one ${interviewType} interview question in English.
     Ask unique questions every time, fresher friendly. Only output the question.`;
 
     setLoading(true);
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-      }
-    );
+    setError("");
+    
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+        }
+      );
 
-    const data = await res.json();
-    setQuestion(data.candidates?.[0]?.content?.parts?.[0]?.text || "No question generated.");
-    setFeedback("");
-    setLoading(false);
+      if (!res.ok) {
+        throw new Error(`API Error: ${res.status} - ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      
+      if (data.error) {
+        throw new Error(data.error.message || "API returned an error");
+      }
+      
+      const questionText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!questionText) {
+        throw new Error("No question generated. Please try again.");
+      }
+      
+      setQuestion(questionText);
+      setFeedback("");
+    } catch (error) {
+      console.error("Error generating question:", error);
+      setError(`Failed to generate question: ${error.message}`);
+      setQuestion("");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getFeedback = async () => {
-    if (!answer) return alert("Speak or type your answer first");
+    if (!answer.trim()) {
+      setError("Please speak or type your answer first");
+      return;
+    }
+    
     if (!apiKey) {
-      alert('Please enter your Gemini API Key')
-      return
+      setError('Please enter your Gemini API Key');
+      return;
     }
-    if(!question || question == ""){
-      return alert("Generate a question first.")
+    
+    if (!question || question === "") {
+      setError("Please generate a question first.");
+      return;
     }
+    
     setGenerateFeedback(true);
-    const prompt = `
-      Evaluate this job interview answer for clarity, fluency, grammar.
-      Give feedback within 100 words, add a new blank line and give score out of 10.
-      Also don't keep the text plain with no bold or italics
-      Question: ${question}
-      Answer: ${answer}
-    `;
+    setError("");
+    
+    try {
+      const prompt = `
+        Evaluate this job interview answer for clarity, fluency, grammar.
+        Give feedback within 100 words, add a new blank line and give score out of 10.
+        Also don't keep the text plain with no bold or italics
+        Question: ${question}
+        Answer: ${answer}
+      `;
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error(`API Error: ${res.status} - ${res.statusText}`);
       }
-    );
 
-    const data = await res.json();
-    setFeedback(data.candidates?.[0]?.content?.parts?.[0]?.text || "No feedback received.");
-    setGenerateFeedback(false);
+      const data = await res.json();
+      
+      if (data.error) {
+        throw new Error(data.error.message || "API returned an error");
+      }
+      
+      const feedbackText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!feedbackText) {
+        throw new Error("No feedback generated. Please try again.");
+      }
+      
+      setFeedback(feedbackText);
+    } catch (error) {
+      console.error("Error generating feedback:", error);
+      setError(`Failed to generate feedback: ${error.message}`);
+      setFeedback("");
+    } finally {
+      setGenerateFeedback(false);
+    }
   };
 
   return (
@@ -130,6 +187,22 @@ const AIHRInterviewContent = ({ apiKey }) => {
         Use Chrome Browser on desktop / android and have a proper microphone setup.<br />
         Speak Slowly and Clearly, without taking pause.
       </p>
+
+      {error && (
+        <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-start gap-2">
+          <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+          <div className="flex-1">
+            <p className="text-sm font-medium">{error}</p>
+          </div>
+          <button onClick={() => setError("")} className="text-red-700 hover:text-red-900">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
         <select
@@ -159,14 +232,15 @@ const AIHRInterviewContent = ({ apiKey }) => {
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-7 mb-4 w-full justify-center">
         <button
           onClick={startListening}
-          disabled={isListening}
+          disabled={isListening || !question}
           className="w-full sm:w-auto px-6 sm:px-4 py-3 sm:py-2 bg-green-600 text-white rounded-lg text-base sm:text-xl font-semibold hover:bg-green-700 transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           🎙️ Speak
         </button>
         <button
           onClick={stopListening}
-          className="w-full sm:w-auto px-6 sm:px-4 py-3 sm:py-2 bg-red-500 text-white rounded-lg text-base sm:text-xl font-semibold hover:bg-red-600 transition-all duration-300 hover:scale-105 active:scale-95"
+          disabled={!question}
+          className="w-full sm:w-auto px-6 sm:px-4 py-3 sm:py-2 bg-red-500 text-white rounded-lg text-base sm:text-xl font-semibold hover:bg-red-600 transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           ⏹️ Stop
         </button>

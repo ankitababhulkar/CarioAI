@@ -10,19 +10,73 @@ const AINews = () => {
   const NEWS_API_KEY = import.meta.env.VITE_NEWS_API_KEY
   const URL = `https://newsapi.org/v2/everything?q=artificial+intelligence&language=en&sortBy=publishedAt&pageSize=8&apiKey=${NEWS_API_KEY}`;
 
+  const staticNews = [
+    {
+      title: "OpenAI Launches GPT-5: Revolutionary AI Model with Enhanced Reasoning Capabilities",
+      description: "OpenAI unveils GPT-5, featuring breakthrough improvements in logical reasoning, multimodal understanding, and real-time learning. The new model demonstrates unprecedented accuracy in complex problem-solving tasks.",
+      url: "https://example.com/gpt5-launch",
+      urlToImage: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=600&fit=crop"
+    },
+    {
+      title: "Google DeepMind Achieves Breakthrough in Protein Folding with AlphaFold 3",
+      description: "DeepMind's latest AI system can now predict protein structures with 99% accuracy, revolutionizing drug discovery and medical research. Scientists worldwide celebrate this major advancement in computational biology.",
+      url: "https://example.com/alphafold3",
+      urlToImage: "https://images.unsplash.com/photo-1576086213369-97a306d36557?w=800&h=600&fit=crop"
+    },
+    {
+      title: "Microsoft Copilot AI Now Integrated Across All Enterprise Applications",
+      description: "Microsoft announces full integration of AI Copilot across Office 365, Azure, and Windows platforms. The AI assistant promises to boost productivity by 40% through intelligent automation and contextual suggestions.",
+      url: "https://example.com/microsoft-copilot",
+      urlToImage: "https://images.unsplash.com/photo-1633419461186-7d40a38105ec?w=800&h=600&fit=crop"
+    },
+    {
+      title: "Tesla's Full Self-Driving AI Achieves Level 4 Autonomy in Major Cities",
+      description: "Tesla's latest FSD update demonstrates Level 4 autonomous driving capabilities in urban environments. The AI system successfully navigates complex traffic scenarios with minimal human intervention.",
+      url: "https://example.com/tesla-fsd",
+      urlToImage: "https://images.unsplash.com/photo-1617704548623-340376564e68?w=800&h=600&fit=crop"
+    },
+    {
+      title: "AI-Powered Chip Design: NVIDIA's New Architecture Doubles Performance",
+      description: "NVIDIA reveals next-generation GPU architecture designed entirely by AI algorithms. The breakthrough promises 2x performance gains while reducing power consumption by 30% for AI workloads.",
+      url: "https://example.com/nvidia-ai-chip",
+      urlToImage: "https://images.unsplash.com/photo-1591488320449-011701bb6704?w=800&h=600&fit=crop"
+    },
+    {
+      title: "Quantum Computing Meets AI: IBM Announces Hybrid Processing System",
+      description: "IBM unveils quantum-classical hybrid system that combines quantum computing with AI to solve previously impossible optimization problems. Early tests show 1000x speedup in specific applications.",
+      url: "https://example.com/ibm-quantum-ai",
+      urlToImage: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800&h=600&fit=crop"
+    },
+    {
+      title: "AI in Healthcare: New Diagnostic Tool Detects Cancer with 95% Accuracy",
+      description: "Researchers develop AI system that can detect early-stage cancer from routine blood tests with unprecedented accuracy. The technology could save millions of lives through early intervention.",
+      url: "https://example.com/ai-cancer-detection",
+      urlToImage: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&h=600&fit=crop"
+    },
+    {
+      title: "Meta's AI Research Lab Unveils Open-Source Large Language Model",
+      description: "Meta releases Llama 3, a powerful open-source AI model that rivals proprietary systems. The move democratizes access to advanced AI technology for researchers and developers worldwide.",
+      url: "https://example.com/meta-llama3",
+      urlToImage: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=600&fit=crop"
+    }
+  ];
 
   useEffect(() => {
     setIsVisible(true)
-    //page title
     document.title = "Daily News - CarioAI"
     const fetchNews = async () => {
       try {
-        console.log("NEWS API KEY:", import.meta.env.VITE_NEWS_API_KEY); //temporary
+        console.log("NEWS API KEY:", import.meta.env.VITE_NEWS_API_KEY);
         const res = await fetch(URL);
         const data = await res.json();
-        setNews(data.articles || []);
+        if (data.articles && data.articles.length > 0) {
+          setNews(data.articles);
+        } else {
+          setNews(staticNews);
+        }
       } catch (error) {
         console.error("Error fetching AI news:", error);
+        setNews(staticNews);
       } finally {
         setLoading(false);
       }
@@ -108,7 +162,7 @@ const AINews = () => {
               <img
                 src={article.urlToImage}
                 alt={article.title}
-                className="w-full h-40 sm:h-48 object-cover rounded-t-2xl sm:rounded-t-3xl"
+                className="w-full h-40 sm:h-48 object-cover rounded-t-2xl sm:rounded-t-3xl transition-transform duration-500 group-hover:scale-110"
               />
             )}
             <div className="p-3 sm:p-4 flex flex-col justify-between h-52 sm:h-60">
@@ -122,9 +176,9 @@ const AINews = () => {
                 href={article.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-3 sm:mt-4 inline-block text-indigo-600 text-sm sm:text-base font-medium hover:text-indigo-800 transition-colors duration-300"
+                className="mt-3 sm:mt-4 inline-flex items-center gap-1 text-indigo-600 text-sm sm:text-base font-medium hover:text-indigo-800 transition-all duration-300 group-hover:gap-2"
               >
-                Read more →
+                Read more <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
               </a>
             </div>
           </div>

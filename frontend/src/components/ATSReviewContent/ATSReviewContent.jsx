@@ -8,10 +8,18 @@ const ATSReviewContent = ({ apiKey, selectedFile }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleAnalyze = async () => {
-    if (!apiKey) return alert("Enter your Gemini API Key.");
-    if (!selectedFile) return alert("Upload your resume first.");
+    if (!apiKey) {
+      alert("Please enter your Gemini API Key.");
+      return;
+    }
+    
+    if (!selectedFile) {
+      alert("Please upload your resume first.");
+      return;
+    }
 
     setIsAnalyzing(true);
+    setResumeContent(null);
 
     try {
       const formData = new FormData();
@@ -27,10 +35,35 @@ const ATSReviewContent = ({ apiKey, selectedFile }) => {
         }
       );
 
+      if (!res.data || !res.data.feedback) {
+        throw new Error("No analysis received from server");
+      }
+
       setResumeContent(res.data.feedback);
     } catch (err) {
-      console.error(err);
-      setResumeContent({ error: "Failed to analyze resume" });
+      console.error("Error analyzing resume:", err);
+      
+      let errorMessage = "Failed to analyze resume. ";
+      
+      if (err.response) {
+        if (err.response.status === 401) {
+          errorMessage = "Invalid API Key. Please check your Gemini API Key.";
+        } else if (err.response.status === 429) {
+          errorMessage = "API rate limit exceeded. Please try again later.";
+        } else if (err.response.status === 413) {
+          errorMessage = "Resume file is too large. Please upload a smaller file.";
+        } else if (err.response.data?.error) {
+          errorMessage = err.response.data.error;
+        } else {
+          errorMessage += `Server error: ${err.response.status}`;
+        }
+      } else if (err.request) {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setResumeContent({ error: errorMessage });
     } finally {
       setIsAnalyzing(false);
     }
